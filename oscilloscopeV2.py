@@ -15,12 +15,16 @@ verbose = False
 
 
 class SerialWorker(QObject):
-    def __init__(self, numLines, dataNumBytes):
+    def __init__(self, numLines=1, dataNumBytes=1):
         super(SerialWorker, self).__init__()
         self.numLines = numLines
         self.dataNumBytes = dataNumBytes
         self.rawData = deque()
-        self.acquire = False
+        self.connected = False
+
+    def updateDataStruct(self, dataNumBytes=1, numLines=1):
+        self.dataNumBytes = dataNumBytes
+        self.numLines = numLines
 
     def connect(self, serialPort, serialBaud):
         try:
@@ -28,15 +32,15 @@ class SerialWorker(QObject):
                                                   serialBaud, timeout=4)
             print('Connected to ' + str(serialPort) + ' at '
                   + str(serialBaud) + ' BAUD.')
-            self.acquire = True
+            self.connected = True
         except Exception as e:
             print("Failed to connect with " + str(serialPort) + ' at '
                   + str(serialBaud) + ' BAUD.')
-            print(e)
+            self.connected = False
 
     def listen(self):
         new_val = [0] * self.numLines
-        while (self.acquire):
+        while (self.connected):
             a = int.from_bytes(self.serialConnection.read(1), 'little')
 #            while a != 168:
 #                a = int.from_bytes(self.serialConnection.read(1), 'little')
@@ -61,12 +65,10 @@ class Oscilloscope(FigureCanvasQTAgg):
         self.setParent(parent)
         self.delay = 0
         self.acquire = False
-        self.worker = SerialWorker(1, 1)
+        self.worker = SerialWorker()
         self.thread = QThread()
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.listen)
-        # Temporary
-        self.isReceiving = False
 
     def plot(self):
         if self.acquire:
@@ -78,10 +80,12 @@ class Oscilloscope(FigureCanvasQTAgg):
             self.delay = self.delay % 5
             self.fig.canvas.draw()
 
-    def start(self, serialPort, serialBaud):
-        self.acquire = True
+    def start(self, serialPort, serialBaud, dataSize, numLines):
         self.worker.connect(serialPort, serialBaud)
-        self.thread.start()
+        self.worker.updateDataStruct(dataSize, numLines)
+        if self.worker.connected:
+            self.thread.start()
+            self.acquire = True
 
     def backgroundThread(self):
         '''Defines the serial listening task'''
@@ -97,7 +101,6 @@ class Oscilloscope(FigureCanvasQTAgg):
                                             self.dataNumBytes), 'little',
                                             signed=True)
             self.rawData.append(new_val.copy())
-            self.isReceiving = True
 
 
 class OscilloscopeWindow:
@@ -140,10 +143,13 @@ class OscilloscopeWindow:
         """Start the acquisition of serial data"""
         serialPort = self.ui.comboBoxPort.currentText()
         baudRate = int(self.ui.comboBoxBaud.currentText())
+
+        dataSize = self.ui.spinBoxDataSize.value()
+        numLines = self.ui.spinBoxNumberLines.value()
         if verbose:
             print("Baud rate:"+str(baudRate))
             print("Serial Port:"+serialPort)
-        self.oscilloscope.start(serialPort, baudRate)
+        self.oscilloscope.start(serialPort, baudRate, dataSize, numLines)
 
     def updateComboBoxPort(self):
         """Udpate the comboBox with the serial port available"""
