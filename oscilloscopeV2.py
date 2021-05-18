@@ -80,16 +80,17 @@ class Oscilloscope(FigureCanvasQTAgg):
             self.delay = self.delay % 5
             self.fig.canvas.draw()
 
-    def initPlot(self, numLines):
+    def initPlot(self, numLines, ymin, ymax):
         data = np.zeros((25, numLines))
-        self.axes.set_ylim([-255, 255])
+        self.axes.set_ylim([ymin, ymax])
         self.lines = self.axes.plot(data)
 
-    def start(self, serialPort, serialBaud, dataSize, numLines):
+    def start(self, serialPort, serialBaud, dataSize, numLines,
+              ymax, ymin):
         self.worker.connect(serialPort, serialBaud)
         self.worker.updateDataStruct(dataSize, numLines)
         if self.worker.connected:
-            self.initPlot(numLines)
+            self.initPlot(numLines, ymax, ymin)
             self.thread.start()
             self.acquire = True
 
@@ -152,10 +153,14 @@ class OscilloscopeWindow:
 
         dataSize = self.ui.spinBoxDataSize.value()
         numLines = self.ui.spinBoxNumberLines.value()
+
+        ymin = self.ui.spinBoxYMin.value()
+        ymax = self.ui.spinBoxYMax.value()
         if verbose:
             print("Baud rate:"+str(baudRate))
             print("Serial Port:"+serialPort)
-        self.oscilloscope.start(serialPort, baudRate, dataSize, numLines)
+        self.oscilloscope.start(serialPort, baudRate, dataSize,
+                                numLines, ymin, ymax)
 
     def updateComboBoxPort(self):
         """Udpate the comboBox with the serial port available"""
