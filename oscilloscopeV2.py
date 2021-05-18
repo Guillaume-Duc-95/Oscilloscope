@@ -60,7 +60,7 @@ class Oscilloscope(FigureCanvasQTAgg):
         self.data = np.arange(25)*20-255
         self.fig = plt.Figure(figsize=(width/dpi, height/dpi), dpi=dpi)
         self.axes = self.fig.add_subplot(111)
-        self.line, = self.axes.plot(self.data, 'r-')
+        self.lines = None
         FigureCanvasQTAgg.__init__(self, self.fig)
         self.setParent(parent)
         self.delay = 0
@@ -73,17 +73,23 @@ class Oscilloscope(FigureCanvasQTAgg):
     def plot(self):
         if self.acquire:
             a = np.array(self.worker.rawData)
-            a = a[:]
-            self.line.set_ydata(a[-25:])
+            for k, line in enumerate(self.lines):
+                line.set_ydata(a[-25:, k])
             print(self.worker.rawData)
             self.delay += 1
             self.delay = self.delay % 5
             self.fig.canvas.draw()
 
+    def initPlot(self, numLines):
+        data = np.zeros((25, numLines))
+        self.axes.set_ylim([-255, 255])
+        self.lines = self.axes.plot(data)
+
     def start(self, serialPort, serialBaud, dataSize, numLines):
         self.worker.connect(serialPort, serialBaud)
         self.worker.updateDataStruct(dataSize, numLines)
         if self.worker.connected:
+            self.initPlot(numLines)
             self.thread.start()
             self.acquire = True
 
