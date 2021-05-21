@@ -19,7 +19,7 @@ class SerialWorker(QObject):
         super(SerialWorker, self).__init__()
         self.numLines = numLines
         self.dataNumBytes = dataNumBytes
-        self.rawData = deque()
+        self.rawData = deque(maxlen=25)
         self.connected = False
 
     def updateDataStruct(self, dataNumBytes=1, numLines=1):
@@ -41,7 +41,7 @@ class SerialWorker(QObject):
     def listen(self):
         new_val = [0] * self.numLines
         while (self.connected):
-            a = int.from_bytes(self.serialConnection.read(1), 'little')
+#            a = int.from_bytes(self.serialConnection.read(1), 'little')
 #            while a != 168:
 #                a = int.from_bytes(self.serialConnection.read(1), 'little')
 #                pass
@@ -74,7 +74,7 @@ class Oscilloscope(FigureCanvasQTAgg):
         if self.acquire:
             a = np.array(self.worker.rawData)
             for k, line in enumerate(self.lines):
-                line.set_ydata(a[-25:, k])
+                line.set_ydata(a[:, k])
             print(self.worker.rawData)
             self.delay += 1
             self.delay = self.delay % 5
@@ -93,21 +93,6 @@ class Oscilloscope(FigureCanvasQTAgg):
             self.initPlot(numLines, ymax, ymin)
             self.thread.start()
             self.acquire = True
-
-    def backgroundThread(self):
-        '''Defines the serial listening task'''
-        new_val = [0] * self.numLines
-        while (self.acquire):
-            a = int.from_bytes(self.serialConnection.read(1), 'little')
-            while a != 168:
-                print(a)
-                a = int.from_bytes(self.serialConnection.read(1), 'little')
-                pass
-            for i in range(self.numLines):
-                new_val[i] = int.from_bytes(self.serialConnection.read(
-                                            self.dataNumBytes), 'little',
-                                            signed=True)
-            self.rawData.append(new_val.copy())
 
 
 class OscilloscopeWindow:
