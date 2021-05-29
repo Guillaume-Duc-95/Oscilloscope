@@ -97,6 +97,7 @@ class Oscilloscope(FigureCanvasQTAgg):
 
 class OscilloscopeWindow:
     """GUI interface"""
+
     def __init__(self, *args, **kargs):
         super().__init__(*args, **kargs)
         self.app = QtWidgets.QApplication(sys.argv)
@@ -120,6 +121,7 @@ class OscilloscopeWindow:
     def connectSignalsSlots(self):
         """Link button pressed to action"""
         self.ui.pushButtonStart.clicked.connect(self.start)
+        self.ui.comboBoxPort.activated.connect(self.updateComboBoxPort)
         #self.ui.pushButtonStop.clicked.connect(self.stop)
         self.MainWindow.timer.timeout.connect(self.oscilloscope.plot)
 
@@ -133,6 +135,9 @@ class OscilloscopeWindow:
 
     def start(self):
         """Start the acquisition of serial data"""
+        # Disable inputs when connecting
+        self.setStateInputs(False)
+
         serialPort = self.ui.comboBoxPort.currentText()
         baudRate = int(self.ui.comboBoxBaud.currentText())
 
@@ -146,6 +151,8 @@ class OscilloscopeWindow:
             print("Serial Port:"+serialPort)
         self.oscilloscope.start(serialPort, baudRate, dataSize,
                                 numLines, ymin, ymax)
+        # disable the input change when acquiring
+        self.setStateInputs(not self.oscilloscope.acquire)
 
     def updateComboBoxPort(self):
         """Udpate the comboBox with the serial port available"""
@@ -154,6 +161,16 @@ class OscilloscopeWindow:
         if listOfPort:
             self.ui.comboBoxPort.clear()
             self.ui.comboBoxPort.insertItems(len(listOfPort), listOfPort)
+
+    def setStateInputs(self, state):
+        """Disable the comboBoxes and spinBoxes"""
+        self.ui.comboBoxBaud.setEnabled(state)
+        self.ui.comboBoxPort.setEnabled(state)
+
+        self.ui.spinBoxDataSize.setEnabled(state)
+        self.ui.spinBoxNumberLines.setEnabled(state)
+        self.ui.spinBoxYMax.setEnabled(state)
+        self.ui.spinBoxYMin.setEnabled(state)
 
 
 def findSerialPort():
