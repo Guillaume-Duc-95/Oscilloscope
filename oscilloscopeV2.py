@@ -1,3 +1,4 @@
+
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QTimer, QObject, QThread
 import sys
@@ -41,10 +42,9 @@ class SerialWorker(QObject):
     def listen(self):
         new_val = [0] * self.numLines
         while (self.connected):
-#            a = int.from_bytes(self.serialConnection.read(1), 'little')
-#            while a != 168:
-#                a = int.from_bytes(self.serialConnection.read(1), 'little')
-#                pass
+            a = int.from_bytes(self.serialConnection.read(1), 'little')
+            while a != 168:
+                a = int.from_bytes(self.serialConnection.read(1), 'little')
 
             for i in range(self.numLines):
                 new_val[i] = int.from_bytes(self.serialConnection.read(
