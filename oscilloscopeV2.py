@@ -8,6 +8,8 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 import serial
 from pathlib import Path
 from collections import deque
+import json
+from pathlib import Path
 
 from oscilloscope_gui import Ui_MainWindow
 
@@ -37,6 +39,7 @@ class SerialWorker(QObject):
         except Exception as e:
             print("Failed to connect with " + str(serialPort) + ' at '
                   + str(serialBaud) + ' BAUD.')
+            print(e)
             self.connected = False
 
     def listen(self):
@@ -51,7 +54,8 @@ class SerialWorker(QObject):
                                             self.dataNumBytes), 'little',
                                             signed=True)
             self.rawData.append(new_val.copy())
-            print(new_val)
+            if verbose:
+                print(new_val)
 
 
 class Oscilloscope(FigureCanvasQTAgg):
@@ -75,7 +79,6 @@ class Oscilloscope(FigureCanvasQTAgg):
             a = np.array(self.worker.rawData)
             for k, line in enumerate(self.lines):
                 line.set_ydata(a[:, k])
-            print(self.worker.rawData)
             self.delay += 1
             self.delay = self.delay % 5
             self.fig.canvas.draw()
@@ -122,6 +125,8 @@ class OscilloscopeWindow:
         """Link button pressed to action"""
         self.ui.pushButtonStart.clicked.connect(self.start)
         self.ui.comboBoxPort.activated.connect(self.updateComboBoxPort)
+        self.ui.actionSave_config.triggered.connect(self.saveConfig)
+        self.ui.actionLoad_config.triggered.connect(self.loadConfig)
         #self.ui.pushButtonStop.clicked.connect(self.stop)
         self.MainWindow.timer.timeout.connect(self.oscilloscope.plot)
 
@@ -171,6 +176,57 @@ class OscilloscopeWindow:
         self.ui.spinBoxNumberLines.setEnabled(state)
         self.ui.spinBoxYMax.setEnabled(state)
         self.ui.spinBoxYMin.setEnabled(state)
+
+    def saveConfig(self):
+        """Save the current inputs (except Port) in a json file"""
+        # Create a dialog Window to select the config file
+        dialogWindow = QtWidgets.QFileDialog(self.MainWindow)
+        fileName = dialogWindow.getSaveFileName(self.MainWindow, "Save Config",
+                                                str(Path()),
+                                                "Configuration File (*.json)")
+        # Open the config file and set it in the main window
+        if verbose:
+            print("Save config file under:"+str(fileName[0]))
+
+        dict_ = dict()
+        dict_["baudRate"] = int(self.ui.comboBoxBaud.currentText())
+
+        dict_["dataSize"] = self.ui.spinBoxDataSize.value()
+        dict_["numLines"] = self.ui.spinBoxNumberLines.value()
+
+        dict_["ymin"] = self.ui.spinBoxYMin.value()
+        dict_["ymax"] = self.ui.spinBoxYMax.value()
+
+        if fileName[0]:
+            fileName = Path(fileName[0])
+            print(fileName.suffix)
+            # Check if .json extension is already persent at the end
+            if fileName.suffix != '.json':
+                fileName = fileName.parent / (fileName.name + '.json')
+
+        with open(fileName, "w") as file_:
+            json.dump(dict_, fp=file_, indent=4)
+
+    def loadConfig(self):
+        """Load the inputs from a given json file"""
+        # Create a dialog Window to select the config file
+        dialogWindow = QtWidgets.QFileDialog(self.MainWindow)
+        filename = dialogWindow.getOpenFileName(self.MainWindow, "Load Config",
+                                                str(Path()),
+                                                "Configuration File (*.json)")
+        # Open the config file and set it in the main window
+        if verbose:
+            print("Open config file:"+str(filename[0]))
+        if filename[0]:
+            with open(Path(filename[0])) as file_:
+                dict_ = json.load(file_)
+        self.ui.comboBoxBaud.setCurrentText(str(dict_["baudRate"]))
+
+        self.ui.spinBoxDataSize.setValue(dict_["dataSize"])
+        self.ui.spinBoxNumberLines.setValue(dict_["numLines"])
+
+        self.ui.spinBoxYMin.setValue(dict_["ymin"])
+        self.ui.spinBoxYMax.setValue(dict_["ymax"])
 
 
 def findSerialPort():
