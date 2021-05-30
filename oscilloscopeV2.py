@@ -19,7 +19,7 @@ class SerialWorker(QObject):
         super(SerialWorker, self).__init__()
         self.numLines = numLines
         self.dataNumBytes = dataNumBytes
-        self.rawData = deque()
+        self.rawData = deque(maxlen=25)
         self.connected = False
 
     def updateDataStruct(self, dataNumBytes=1, numLines=1):
@@ -41,7 +41,7 @@ class SerialWorker(QObject):
     def listen(self):
         new_val = [0] * self.numLines
         while (self.connected):
-            a = int.from_bytes(self.serialConnection.read(1), 'little')
+#            a = int.from_bytes(self.serialConnection.read(1), 'little')
 #            while a != 168:
 #                a = int.from_bytes(self.serialConnection.read(1), 'little')
 #                pass
@@ -60,7 +60,7 @@ class Oscilloscope(FigureCanvasQTAgg):
         self.data = np.arange(25)*20-255
         self.fig = plt.Figure(figsize=(width/dpi, height/dpi), dpi=dpi)
         self.axes = self.fig.add_subplot(111)
-        self.line, = self.axes.plot(self.data, 'r-')
+        self.lines = None
         FigureCanvasQTAgg.__init__(self, self.fig)
         self.setParent(parent)
         self.delay = 0
@@ -73,34 +73,26 @@ class Oscilloscope(FigureCanvasQTAgg):
     def plot(self):
         if self.acquire:
             a = np.array(self.worker.rawData)
-            a = a[:]
-            self.line.set_ydata(a[-25:])
+            for k, line in enumerate(self.lines):
+                line.set_ydata(a[:, k])
             print(self.worker.rawData)
             self.delay += 1
             self.delay = self.delay % 5
             self.fig.canvas.draw()
 
-    def start(self, serialPort, serialBaud, dataSize, numLines):
+    def initPlot(self, numLines, ymin, ymax):
+        data = np.zeros((25, numLines))
+        self.axes.set_ylim([ymin, ymax])
+        self.lines = self.axes.plot(data)
+
+    def start(self, serialPort, serialBaud, dataSize, numLines,
+              ymax, ymin):
         self.worker.connect(serialPort, serialBaud)
         self.worker.updateDataStruct(dataSize, numLines)
         if self.worker.connected:
+            self.initPlot(numLines, ymax, ymin)
             self.thread.start()
             self.acquire = True
-
-    def backgroundThread(self):
-        '''Defines the serial listening task'''
-        new_val = [0] * self.numLines
-        while (self.acquire):
-            a = int.from_bytes(self.serialConnection.read(1), 'little')
-            while a != 168:
-                print(a)
-                a = int.from_bytes(self.serialConnection.read(1), 'little')
-                pass
-            for i in range(self.numLines):
-                new_val[i] = int.from_bytes(self.serialConnection.read(
-                                            self.dataNumBytes), 'little',
-                                            signed=True)
-            self.rawData.append(new_val.copy())
 
 
 class OscilloscopeWindow:
@@ -146,10 +138,14 @@ class OscilloscopeWindow:
 
         dataSize = self.ui.spinBoxDataSize.value()
         numLines = self.ui.spinBoxNumberLines.value()
+
+        ymin = self.ui.spinBoxYMin.value()
+        ymax = self.ui.spinBoxYMax.value()
         if verbose:
             print("Baud rate:"+str(baudRate))
             print("Serial Port:"+serialPort)
-        self.oscilloscope.start(serialPort, baudRate, dataSize, numLines)
+        self.oscilloscope.start(serialPort, baudRate, dataSize,
+                                numLines, ymin, ymax)
 
     def updateComboBoxPort(self):
         """Udpate the comboBox with the serial port available"""
